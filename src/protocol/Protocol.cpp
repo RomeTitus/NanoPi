@@ -8,7 +8,6 @@ Protocol::Protocol(DeviceRegistry* reg) {
 // PUBLIC ENTRY POINT
 // ------------------------------------------------------------
 String Protocol::processInput(String input) {
-
     // If it looks like binary payload (starts with 0xAA later handled separately)
     if (input.length() > 0 && (uint8_t)input[0] == 0xAA) {
         return "BINARY_NOT_SUPPORTED_AS_STRING";
@@ -46,8 +45,6 @@ String Protocol::processTextBatch(String input) {
             if (!translateToBinary(token, binary, len)) {
                 result += "ERR";
             } else {
-                Serial.println("Processing binary");
-
                 processBinary(binary, len, response, responseLen);
 
                 // Append response bytes to result
@@ -115,8 +112,6 @@ uint8_t convertParam(String val, uint8_t* out) {
 // ------------------------------------------------------------
 bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
     
-    Serial.print(String("Translating: ") + input);
-
     int commaIndex = input.indexOf(',');
     String key = (commaIndex == -1)
                     ? input
@@ -125,7 +120,6 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
     uint8_t cmd;
 
     if (!registry->getCmdByText(key, cmd)) {
-        Serial.println(" - Command not found");
         return false;
     }
 
@@ -146,9 +140,8 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
         // Convert parameter and add bytes
         uint8_t paramBytes[2];
         uint8_t paramLen = convertParam(val, paramBytes);
-        
+
         if (paramLen == 0) {
-            Serial.println(" - Invalid parameter: " + val);
             return false;
         }
         
@@ -161,14 +154,6 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
     }
 
     len = idx;
-
-    Serial.print(" >> Raw bytes: ");
-    for (int i = 0; i < len; i++) {
-        Serial.print(out[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
-
     return true;
 }
 
@@ -193,7 +178,6 @@ void Protocol::processBinary(uint8_t* data,
 
             IDevice* dev = registry->getDeviceByCmd(cmd);
             
-            Serial.println("Got Device for cmd: " + String(cmd, HEX) + " -> " + (dev ? "FOUND" : "NOT FOUND"));
             if (!dev) {
                 response[0] = 0xAA;
                 response[1] = 0xFD; // unknown command
@@ -205,18 +189,14 @@ void Protocol::processBinary(uint8_t* data,
             // VALIDATION (DEVICE OWNED)
             // ----------------------------------------------------
             String error;
-            
-            Serial.println(String("going to validate with data length: ") + String(len - i - 1));
 
             if (!dev->validate(&data[i + 1], len - i - 1, error)) {
-                Serial.println("Validation failed: " + error);
                 response[0] = 0xAA;
                 response[1] = 0xFE; // validation error
                 responseLen = 2;
                 return;
             }
             
-            Serial.println("Handler validation passed, executing command...");
             // ----------------------------------------------------
             // EXECUTION
             // ----------------------------------------------------
@@ -225,12 +205,8 @@ void Protocol::processBinary(uint8_t* data,
                               response,
                               responseLen);
 
-            Serial.println("Command executed, response length: " + String(responseLen));
-
             return;
         }
-
-        Serial.println("Invalid Starting byte...");
     }
 
     // No sync byte found

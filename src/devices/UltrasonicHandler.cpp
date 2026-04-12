@@ -1,31 +1,16 @@
 #include "UltrasonicHandler.h"
 
 UltrasonicHandler::UltrasonicHandler() {
-
-    schema = {
-        0x02,
-        "US",
-        2,
-        {
-            {ARG_UINT8, 0, 13}, // trig
-            {ARG_UINT8, 0, 13}  // echo
-        }
-    };
-}
-
-CommandSchema UltrasonicHandler::getSchema() {
-    return schema;
 }
 
 bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
-
-    if (len - 1 < schema.argCount) {
+    if (len - 1 < 3) { 
         error = "US: missing args";
         return false;
     }
 
-    uint8_t trig = data[1];
-    uint8_t echo = data[2];
+    uint8_t trig = data[0];
+    uint8_t echo = data[1];
 
     if (trig > 13 || echo > 13) {
         error = "US: invalid pin";
@@ -40,18 +25,17 @@ bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
     return true;
 }
 
-String UltrasonicHandler::handleText(String input) {
-    return String(234); // placeholder
-}
-
 void UltrasonicHandler::handleBinary(uint8_t* data,
                                      uint8_t len,
                                      uint8_t* response,
                                      uint8_t& responseLen) {
+    uint8_t trigType = data[1];
+    uint8_t trig = data[2];
+    
+    uint8_t echoType = data[3];
+    uint8_t echo = data[4];
 
-    uint8_t trig = data[1];
-    uint8_t echo = data[2];
-
+    //Add support or analog pins later (e.g., A0-A7)
     long distance = readDistance(trig, echo);
 
     response[0] = 0xAA;
@@ -65,6 +49,7 @@ long UltrasonicHandler::readDistance(uint8_t trigPin, uint8_t echoPin) {
     pinMode(trigPin, OUTPUT);
     pinMode(echoPin, INPUT);
 
+    //And if we have analog?
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);

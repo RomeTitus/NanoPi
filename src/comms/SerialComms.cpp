@@ -11,10 +11,8 @@ void SerialComms::begin(unsigned long baud) {
 void SerialComms::loop() {
     if (Serial.available()) {
         String input = Serial.readStringUntil('\n');
-        Serial.println(input);
-
-        String result = protocol->processInput(input);
         
+        String result = protocol->processInput(input);
         Serial.println(result);
     }
 }

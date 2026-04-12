@@ -44,7 +44,6 @@ IDevice* DeviceRegistry::getDeviceByText(String text) {
 // Text → command ID (used by Protocol translation)
 // ----------------------------------------------------
 bool DeviceRegistry::getCmdByText(String text, uint8_t& cmd) {
-
     for (int i = 0; i < count; i++) {
         if (entries[i].text == text) {
             cmd = entries[i].cmd;
