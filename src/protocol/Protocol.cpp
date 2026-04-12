@@ -28,7 +28,7 @@ String Protocol::processTextBatch(String input) {
 
     int start = 0;
 
-    while (start < input.length()) {
+    while (start < (int)input.length()) {
 
         int end = input.indexOf(';', start);
         if (end == -1) end = input.length();
@@ -56,7 +56,7 @@ String Protocol::processTextBatch(String input) {
             }
         }
 
-        if (end >= input.length()) break;
+        if (end >= (int)input.length()) break;
         result += ";";
         start = end + 1;
     }
@@ -87,7 +87,7 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
 
     int start = commaIndex + 1;
 
-    while (start > 0 && start < input.length()) {
+    while (start > 0 && start < (int)input.length()) {
 
         int next = input.indexOf(',', start);
         if (next == -1) next = input.length();
@@ -97,7 +97,7 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
 
         out[idx++] = (uint8_t)val.toInt();
 
-        if (next >= input.length()) break;
+        if (next >= (int)input.length()) break;
         start = next + 1;
     }
 

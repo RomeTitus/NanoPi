@@ -21,7 +21,7 @@ bool TextTranslator::translate(String input, uint8_t* out, uint8_t& outLen) {
             uint8_t idx = 2;
             int start = commaIndex + 1;
 
-            while (start > 0 && start < input.length()) {
+            while (start > 0 && start < (int)input.length()) {
                 int next = input.indexOf(',', start);
                 if (next == -1) next = input.length();
 
@@ -29,7 +29,7 @@ bool TextTranslator::translate(String input, uint8_t* out, uint8_t& outLen) {
 
                 out[idx++] = val.toInt(); // simple conversion
 
-                if (next >= input.length()) break;
+                if (next >= (int)input.length()) break;
                 start = next + 1;
             }
 
