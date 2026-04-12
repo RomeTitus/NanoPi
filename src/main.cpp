@@ -1,16 +1,30 @@
-#include <Arduino.h>
-#include "comms/I2CHandler.h"
-#include "comms/SerialHandler.h"
+#include "devices/DeviceRegistry.h"
+#include "devices/PinHandler.h"
+#include "devices/UltrasonicHandler.h"
+#include "protocol/Protocol.h"
+#include "comms/SerialComms.h"
+#include "comms/I2CComms.h"
+
+DeviceRegistry registry;
+
+PinHandler pinHandler;
+UltrasonicHandler usHandler;
+
+Protocol protocol(&registry);
+
+SerialComms serialComms(&protocol);
+I2CComms i2cComms(&protocol);
 
 void setup() {
+    Serial.begin(9600);
 
-    pinMode(13, OUTPUT);
-    digitalWrite(13, HIGH);
+    registry.registerCommand(0x01, "Pin", &pinHandler);
+    registry.registerCommand(0x02, "US", &usHandler);
 
-    I2CHandler::begin(0x04);
-    SerialHandler::begin(9600);
+    serialComms.begin();
+    i2cComms.begin();
 }
 
 void loop() {
-    SerialHandler::loop();
+    serialComms.loop();
 }
