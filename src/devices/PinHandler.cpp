@@ -9,7 +9,14 @@ bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
         return false;
     }
 
-    //0 0 2 1 DeviceId, Write or Read, Digital or Analog, pin value
+    Serial.print("Raw Data:");
+    for (size_t i = 0; i < len; i++)
+    {
+        Serial.print(data[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+    //1 0 2 1 DeviceId, Write or Read, Digital or Analog, pin value
     uint8_t mode = data[1]; //Write or Read
     uint8_t pinType = data[2];
     uint8_t pin = data[3];
@@ -17,6 +24,15 @@ bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
     if(mode == 0) { //write
         state = data[4];
     }
+
+    Serial.print("Parsed Data: mode=");
+    Serial.print(mode);
+    Serial.print(", pinType=");
+    Serial.print(pinType);
+    Serial.print(", pin=");
+    Serial.print(pin);
+    Serial.print(", state=");
+    Serial.println(state);
 
     // pin range check
     if (pin > 13 || (pinType == 1 && (pin == 5 || pin == 6 || pin > 7))) {
