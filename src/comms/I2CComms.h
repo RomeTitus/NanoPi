@@ -9,11 +9,18 @@
 class I2CComms {
 private:
     Protocol* protocol;
-    static uint8_t inputBuffer[32];
-    static uint8_t inputLen;
+
+    // Response queue for batched messages
+    static const uint8_t QUEUE_SIZE = 8;
+    static const uint8_t RESPONSE_SIZE = 5;
+    static const uint8_t INPUT_SIZE = QUEUE_SIZE * RESPONSE_SIZE; //8 x 5 byte messages max (we can increase this if needed)
+    static uint8_t inputBuffer[INPUT_SIZE]; 
+    static uint8_t responseQueue[QUEUE_SIZE][RESPONSE_SIZE];
+    static uint8_t queueCount;
 
     static void onReceive(int len);
     static void onRequest();
+    static void processPacket(uint8_t data[], uint8_t from, uint8_t to);
 
 public:
     I2CComms(Protocol* proto);

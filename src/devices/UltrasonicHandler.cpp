@@ -9,11 +9,21 @@ bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
         return false;
     }
 
-    uint8_t trig = data[0];
-    uint8_t echo = data[1];
+    uint8_t trig = data[1];
+    uint8_t trigType = data[2];
 
-    if (trig > 13 || echo > 13) {
-        error = "US: invalid pin";
+    uint8_t echo = data[3];
+    uint8_t echoType = data[4];
+
+
+
+    if (trig > 13 || (trigType == 1 && (trig == 5 || trig == 6 || trig > 7))) {
+        error = "Trig: invalid pin";
+        return false;
+    }
+
+    if (echo > 13 || (echoType == 1 && (echo == 5 || echo == 6 || echo > 7))) {
+        error = "Echo: invalid pin";
         return false;
     }
 
@@ -29,12 +39,13 @@ void UltrasonicHandler::handleBinary(uint8_t* data,
                                      uint8_t len,
                                      uint8_t* response,
                                      uint8_t& responseLen) {
-    uint8_t trigType = data[1];
-    uint8_t trig = data[2];
-    
-    uint8_t echoType = data[3];
-    uint8_t echo = data[4];
 
+    uint8_t trig = data[1];
+    uint8_t trigType = data[2];
+
+    uint8_t echo = data[3];
+    uint8_t echoType = data[4];
+    
     //Add support or analog pins later (e.g., A0-A7)
     long distance = readDistance(trig, echo);
 

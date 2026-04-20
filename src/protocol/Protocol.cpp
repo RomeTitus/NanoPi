@@ -165,6 +165,12 @@ void Protocol::processBinary(uint8_t* data,
                               uint8_t* response,
                               uint8_t& responseLen) {
 
+    Serial.println("Raw Binary Imput:");
+    for (int i = 0; i < len; i++) {
+        Serial.print(data[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
     responseLen = 0;
 
     for (int i = 0; i < len; i++) {
