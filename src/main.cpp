@@ -16,12 +16,12 @@ SerialComms serialComms(&protocol);
 I2CComms i2cComms(&protocol);
 
 void setup() {
-    Serial.begin(9600);
+    //Serial.begin(9600);
 
     registry.registerCommand(0x01, "Pin", &pinHandler);
     registry.registerCommand(0x02, "US", &usHandler);
 
-    serialComms.begin();
+    //serialComms.begin();
     i2cComms.begin();
 }
 

@@ -4,31 +4,23 @@ UltrasonicHandler::UltrasonicHandler() {
 }
 
 bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
-    if (len - 1 < 3) { 
+    if (len - 1 < 2) { 
         error = "US: missing args";
         return false;
     }
 
     uint8_t trig = data[1];
-    uint8_t trigType = data[2];
+    uint8_t echo = data[2];
 
-    uint8_t echo = data[3];
-    uint8_t echoType = data[4];
-
-
-
-    if (trig > 13 || (trigType == 1 && (trig == 5 || trig == 6 || trig > 7))) {
+    // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
+    if (trig > 21 || trig == 18 || trig == 19) {
         error = "Trig: invalid pin";
         return false;
     }
 
-    if (echo > 13 || (echoType == 1 && (echo == 5 || echo == 6 || echo > 7))) {
+    // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
+    if (echo > 21 || echo == 18 || echo == 19) {
         error = "Echo: invalid pin";
-        return false;
-    }
-
-    if (trig == echo) {
-        error = "US: trig == echo invalid";
         return false;
     }
 
@@ -41,12 +33,8 @@ void UltrasonicHandler::handleBinary(uint8_t* data,
                                      uint8_t& responseLen) {
 
     uint8_t trig = data[1];
-    uint8_t trigType = data[2];
-
-    uint8_t echo = data[3];
-    uint8_t echoType = data[4];
+    uint8_t echo = data[2];
     
-    //Add support or analog pins later (e.g., A0-A7)
     long distance = readDistance(trig, echo);
 
     response[0] = 0xAA;
@@ -57,17 +45,28 @@ void UltrasonicHandler::handleBinary(uint8_t* data,
 
 long UltrasonicHandler::readDistance(uint8_t trigPin, uint8_t echoPin) {
 
-    pinMode(trigPin, OUTPUT);
-    pinMode(echoPin, INPUT);
+    // Convert analog pins to digital equivalents (14-21 are A0-A7)
+    uint8_t actualTrigPin = trigPin;
+    uint8_t actualEchoPin = echoPin;
+    
+    if (trigPin >= 14) {
+        actualTrigPin = trigPin;  // Arduino accepts 14-21 directly for analog pins
+    }
+    
+    if (echoPin >= 14) {
+        actualEchoPin = echoPin;
+    }
 
-    //And if we have analog?
-    digitalWrite(trigPin, LOW);
+    pinMode(actualTrigPin, OUTPUT);
+    pinMode(actualEchoPin, INPUT);
+
+    digitalWrite(actualTrigPin, LOW);
     delayMicroseconds(2);
-    digitalWrite(trigPin, HIGH);
+    digitalWrite(actualTrigPin, HIGH);
     delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
+    digitalWrite(actualTrigPin, LOW);
 
-    long duration = pulseIn(echoPin, HIGH);
+    long duration = pulseIn(actualEchoPin, HIGH);
     long distance = duration * 0.034 / 2;
 
     return distance;

@@ -4,38 +4,25 @@ PinHandler::PinHandler() {
 }
 
 bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
-    if (len - 1 < 3) {
+    if (len < 3) {
         error = "Pin: missing args";
         return false;
     }
 
-    Serial.print("Raw Data:");
-    for (size_t i = 0; i < len; i++)
-    {
-        Serial.print(data[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
-    //1 0 2 1 DeviceId, Write or Read, Digital or Analog, pin value
-    uint8_t mode = data[1]; //Write or Read
-    uint8_t pinType = data[2];
-    uint8_t pin = data[3];
-    uint8_t state = 0;
-    if(mode == 0) { //write
-        state = data[4];
+    // DeviceId, Write or Read, pin number (0-13 digital, 14-21 for A0-A7), [state for writes]
+    uint8_t mode = data[1];  // Write or Read
+    uint8_t pin = data[2];   // Pin number
+    
+    if(mode == 0) {  // write - need state
+        if (len < 4) {
+            error = "Pin: missing state";
+            return false;
+        }
     }
 
-    Serial.print("Parsed Data: mode=");
-    Serial.print(mode);
-    Serial.print(", pinType=");
-    Serial.print(pinType);
-    Serial.print(", pin=");
-    Serial.print(pin);
-    Serial.print(", state=");
-    Serial.println(state);
-
-    // pin range check
-    if (pin > 13 || (pinType == 1 && (pin == 5 || pin == 6 || pin > 7))) {
+    // pin range check (0-13 digital, 14-17 and 20-21 for A0-A3 and A6-A7)
+    // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
+    if (pin > 21 || pin == 18 || pin == 19) {
         error = "Pin: invalid pin";
         return false;
     }
@@ -43,12 +30,6 @@ bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
     // mode check
     if (mode > 1) {
         error = "Pin: invalid mode";
-        return false;
-    }
-
-    // state check
-    if (state > 1) {
-        error = "Pin: invalid state";
         return false;
     }
 
@@ -60,28 +41,28 @@ void PinHandler::handleBinary(uint8_t* data,
                               uint8_t* response,
                               uint8_t& responseLen) {
 
-    uint8_t mode = data[1]; //Write or Read
-    uint8_t pinType = data[2];
-    uint8_t pin = data[3];
+    uint8_t mode = data[1];  // Write or Read
+    uint8_t pin = data[2];   // Pin number (0-13 digital, 14-21 for A0-A7)
     uint8_t state = 0;
-        if(mode == 0) { //write
-        state = data[4];
+    
+    if(mode == 0) {  // write
+        state = data[3];
     }
     
-    if (mode == 0) {
+    bool isAnalog = pin >= 14;  // Pins 14-21 are analog (A0-A7)
+    if (mode == 0) {  // Write
         pinMode(pin, OUTPUT);
-        if(pinType == 0) { //digital  
-            digitalWrite(pin, state);
-        } else {
-            // For simplicity, we treat analog write as digital for now (0 or 255), if we go below 255, it's treated as pwm
-            analogWrite(pin, state == 1 ? 255 : 0);
+        if(isAnalog) {  // analog - use analogWrite for PWM (0-255)
+            analogWrite(pin, !state); //Need to reverse the sate for the relay board, which is active LOW
+        } else {  // digital
+            digitalWrite(pin, !state);
         }
-    } else {
+    } else {  // Read
         pinMode(pin, INPUT);
-        if(pinType == 0) { //digital  
-            state = digitalRead(pin);
-        } else {
+        if(isAnalog) {  // analog
             state = analogRead(pin);
+        } else {  // digital
+            state = digitalRead(pin);
         }
     }
 

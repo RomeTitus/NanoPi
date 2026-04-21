@@ -164,18 +164,11 @@ void Protocol::processBinary(uint8_t* data,
                               uint8_t len,
                               uint8_t* response,
                               uint8_t& responseLen) {
-
-    Serial.println("Raw Binary Imput:");
-    for (int i = 0; i < len; i++) {
-        Serial.print(data[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
     responseLen = 0;
 
     for (int i = 0; i < len; i++) {
 
-        // 🔥 MISALIGNMENT SAFE SYNC BYTE SEARCH
+        // MISALIGNMENT SAFE SYNC BYTE SEARCH
         if (data[i] == 0xAA) {
 
             if (i + 1 >= len) return;

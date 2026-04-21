@@ -13,7 +13,7 @@ private:
     // Response queue for batched messages
     static const uint8_t QUEUE_SIZE = 8;
     static const uint8_t RESPONSE_SIZE = 5;
-    static const uint8_t INPUT_SIZE = QUEUE_SIZE * RESPONSE_SIZE; //8 x 5 byte messages max (we can increase this if needed)
+    static const uint8_t INPUT_SIZE = QUEUE_SIZE * RESPONSE_SIZE + 2; //8 x 5 + 2 byte messages max (we can increase this if needed)
     static uint8_t inputBuffer[INPUT_SIZE]; 
     static uint8_t responseQueue[QUEUE_SIZE][RESPONSE_SIZE];
     static uint8_t queueCount;

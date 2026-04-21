@@ -47,6 +47,7 @@ void I2CComms::onReceive(int len) {
         return;
 
     int start = -1;
+    queueCount = 0; // Clear response queue on new input
 
     for (int i = 0; i < len; i++) {
 
@@ -75,28 +76,29 @@ void I2CComms::onReceive(int len) {
 void I2CComms::onRequest() {
     if (queueCount == 0) {
         // No queued responses, send fallback (prevents I2C hang)
-        Serial.println("I2C Queue empty, sending fallback");
+        //Serial.println("I2C Queue empty, sending fallback");
         uint8_t fallback[2] = {0xAA, 0x00};
         Wire.write(fallback, 2);
         return;
     }
-    
-    for (uint8_t i = 0; i < queueCount; i++) {
-        Serial.print("Queue Response ");
-        Serial.print(i);
-        Serial.print(": ");
-        for (int j = 0; j < RESPONSE_SIZE; j++) {
-            Serial.print("0x");
-            if (responseQueue[i][j] < 16) Serial.print("0");
-            Serial.print(responseQueue[i][j], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-    }
-
+   
     // Send all queued responses as a single flattened block
-    Wire.write(&responseQueue[0][0], queueCount * RESPONSE_SIZE);
+    uint16_t totalLen = queueCount * RESPONSE_SIZE;
+    Wire.write(&responseQueue[0][0], totalLen);
     
+    // Debug output
+    /*
+    Serial.print("I2C Response: ");
+    uint8_t* responsePtr = &responseQueue[0][0];
+    for (uint16_t i = 0; i < totalLen; i++) {
+        Serial.print("0x");
+        if (responsePtr[i] < 16) Serial.print("0");
+        Serial.print(responsePtr[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.print("| Length: ");
+    Serial.println(totalLen);
+*/
     // Clear queue after sending
     queueCount = 0;
 }
@@ -128,6 +130,7 @@ void I2CComms::processPacket(uint8_t data[], uint8_t from, uint8_t to) {
         queueCount++;
     }
     
+    /*
     // Optional: debug output
     Serial.print("Processed packet: ");
     for (int i = 0; i < msgLen; i++) {
@@ -145,5 +148,5 @@ void I2CComms::processPacket(uint8_t data[], uint8_t from, uint8_t to) {
         Serial.print(" ");
     }
     Serial.println();
-
+*/
 }
