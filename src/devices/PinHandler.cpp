@@ -43,7 +43,7 @@ void PinHandler::handleBinary(uint8_t* data,
 
     uint8_t mode = data[1];  // Write or Read
     uint8_t pin = data[2];   // Pin number (0-13 digital, 14-21 for A0-A7)
-    uint8_t state = 0;
+    uint16_t state = 0;
     
     if(mode == 0) {  // write
         state = data[3];
