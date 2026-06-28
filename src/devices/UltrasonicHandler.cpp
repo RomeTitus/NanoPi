@@ -45,12 +45,12 @@ void UltrasonicHandler::handleBinary(uint8_t* data,
     
     long distance = readDistance(trig, echo);
 
-    if(isDebugEnabled) {
+    if (isDebugEnabled) {
         Serial.print("UltrasonicHandler trig=");
         Serial.print(trig);
         Serial.print(" echo=");
-        Serial.println(echo);
-        Serial.print("UltrasonicHandler distance=");
+        Serial.print(echo);
+        Serial.print(" distance=");
         Serial.println(distance);
     }
 
