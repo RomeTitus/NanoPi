@@ -1,13 +1,20 @@
 #include "I2CComms.h"
+#include "../protocol/StatusCodes.h"
 
 // ----------------------------------------------------
 // STATIC DEFINITIONS (required for Wire callbacks)
 // ----------------------------------------------------
 uint8_t I2CComms::inputBuffer[I2CComms::INPUT_SIZE];
+uint8_t I2CComms::pendingBuffer[I2CComms::INPUT_SIZE];
 
 // Response queue for batched messages
 uint8_t I2CComms::responseQueue[I2CComms::QUEUE_SIZE][I2CComms::RESPONSE_SIZE];
 uint8_t I2CComms::queueCount = 0;
+uint8_t I2CComms::requestFlags = 0;
+volatile uint8_t I2CComms::pendingLen = 0;
+volatile uint8_t I2CComms::pendingFlags = 0;
+volatile bool I2CComms::requestPending = false;
+volatile bool I2CComms::responseReady = false;
 
 // We need a global pointer bridge for ISR safety
 static Protocol* g_protocol = nullptr;
@@ -30,123 +37,263 @@ void I2CComms::begin() {
     Wire.onRequest(I2CComms::onRequest);
 }
 
+void I2CComms::loop() {
+    processPendingRequest();
+}
+
+uint8_t I2CComms::calculateChecksum(const uint8_t* data, uint8_t len) {
+    uint8_t checksum = 0;
+    for (uint8_t i = 0; i < len; i++) {
+        checksum ^= data[i];
+    }
+    return checksum;
+}
+
+bool I2CComms::isDebugEnabled() {
+    return (requestFlags & 0x01) != 0;
+}
+
+void I2CComms::packResponseRecord(const uint8_t* response,
+                                  uint8_t responseLen,
+                                  uint8_t outRecord[RESPONSE_SIZE]) {
+    outRecord[0] = 0xF0; // malformed/unknown
+    outRecord[1] = 0x00;
+    outRecord[2] = 0x00;
+    outRecord[3] = 0x00;
+
+    if (responseLen == 0) {
+        outRecord[0] = 0xF1; // empty response
+        return;
+    }
+
+    if (response[0] != 0xAA) {
+        outRecord[0] = 0xF2; // invalid sync
+        return;
+    }
+
+    // Error frame from protocol: [0xAA, errorCode]
+    if (responseLen == 2) {
+        outRecord[0] = response[1];
+        return;
+    }
+
+    // Success: status + up to 3 data bytes (right-aligned)
+    outRecord[0] = 0x00;
+    uint8_t payloadLen = responseLen - 1;
+    if (payloadLen > 3) {
+        payloadLen = 3;
+    }
+
+    uint8_t start = 4 - payloadLen;
+    for (uint8_t i = 0; i < payloadLen; i++) {
+        outRecord[start + i] = response[1 + i];
+    }
+}
+
 
 
 // ----------------------------------------------------
 // RECEIVE EVENT (MASTER → SLAVE)
-// Split by 0xAA delimiter and process batches
+// Incoming frame: [flags][payload...]
+// Payload may contain multiple variable-length packets delimited by 0xAA.
 // ----------------------------------------------------
 void I2CComms::onReceive(int len) {
-    uint8_t inputLen = 0;
+    (void)len;
 
+    //No Data
+    if(len == 0) {
+        return;
+    }
+    
+    uint8_t inputLen = 0;
     while (Wire.available() && inputLen < I2CComms::INPUT_SIZE) {
         inputBuffer[inputLen++] = Wire.read();
     }
     
-    if (inputLen == 1) 
+    // Drain any overflow bytes from Wire buffer.
+    while (Wire.available()) {
+        (void)Wire.read();
+    }
+
+    if (inputLen == 0) {
         return;
-
-    int start = -1;
-    queueCount = 0; // Clear response queue on new input
-
-    for (int i = 0; i < len; i++) {
-
-        if (inputBuffer[i] == 0xAA) {
-
-            // If we already had a packet start, process previous packet
-            if (start != -1) {
-                processPacket(inputBuffer, start, i);
-            }
-
-            // Start new packet
-            start = i;
-        }
     }
 
-    // Process final packet
-    if (start != -1) {
-        processPacket(inputBuffer, start, len);
+    // Frame had only one control byte (common during SMBus read commands).
+    // Ignore it and preserve any queued response.
+    if (inputLen <= 1) {
+        return;
     }
+
+    requestFlags = inputBuffer[0];
+
+    // New request arrived; discard any previous queued response so replies stay request-local.
+    noInterrupts();
+    queueCount = 0;
+    responseReady = false;
+    interrupts();
+
+    // Store request and defer heavy processing to main loop.
+    memcpy(pendingBuffer, inputBuffer, inputLen);
+    noInterrupts();
+    pendingLen = inputLen;
+    pendingFlags = requestFlags;
+    requestPending = true;
+    responseReady = false;
+    interrupts();
 }
 
 // ----------------------------------------------------
 // REQUEST EVENT (MASTER READS RESPONSE)
-// Send flattened queued responses in order
+// Outgoing frame: [count][records...][checksum]
 // ----------------------------------------------------
 void I2CComms::onRequest() {
-    if (queueCount == 0) {
-        // No queued responses, send fallback (prevents I2C hang)
-        //Serial.println("I2C Queue empty, sending fallback");
-        uint8_t fallback[2] = {0xAA, 0x00};
-        Wire.write(fallback, 2);
+    const uint8_t MAX_I2C_TX = MAX_I2C_FRAME;
+    uint8_t outBuffer[MAX_I2C_TX];
+    uint8_t offset = 0;
+
+    if (!responseReady) {
+        // Busy/not-ready frame: one record with BUSY status.
+        outBuffer[0] = 0x01;
+        outBuffer[1] = StatusCodes::ERR_BUSY;
+        outBuffer[2] = 0x00;
+        outBuffer[3] = 0x00;
+        outBuffer[4] = 0x00;
+        outBuffer[5] = calculateChecksum(outBuffer, 5);
+        Wire.write(outBuffer, 6);
         return;
     }
-   
-    // Send all queued responses as a single flattened block
-    uint16_t totalLen = queueCount * RESPONSE_SIZE;
-    Wire.write(&responseQueue[0][0], totalLen);
-    
-    // Debug output
-    /*
-    Serial.print("I2C Response: ");
-    uint8_t* responsePtr = &responseQueue[0][0];
-    for (uint16_t i = 0; i < totalLen; i++) {
-        Serial.print("0x");
-        if (responsePtr[i] < 16) Serial.print("0");
-        Serial.print(responsePtr[i], HEX);
-        Serial.print(" ");
+
+    if (queueCount > QUEUE_SIZE) {
+        queueCount = QUEUE_SIZE;
     }
-    Serial.print("| Length: ");
-    Serial.println(totalLen);
-*/
+
+    outBuffer[offset++] = queueCount;
+
+    for (uint8_t i = 0; i < queueCount; i++) {
+        // Keep one byte for checksum.
+        if ((uint8_t)(offset + RESPONSE_SIZE) > (MAX_I2C_TX - 1)) {
+            break;
+        }
+
+        memcpy(&outBuffer[offset], responseQueue[i], RESPONSE_SIZE);
+        offset += RESPONSE_SIZE;
+    }
+
+    // Update count if we truncated records to fit TX size.
+    outBuffer[0] = (offset - 1) / RESPONSE_SIZE;
+
+    uint8_t checksum = calculateChecksum(outBuffer, offset);
+    outBuffer[offset++] = checksum;
+    Wire.write(outBuffer, offset);
+
+    if (isDebugEnabled()) {
+        Serial.print("I2C TX frame: ");
+        for (uint8_t i = 0; i < offset; i++) {
+            Serial.print("0x");
+            if (outBuffer[i] < 16) Serial.print("0");
+            Serial.print(outBuffer[i], HEX);
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+
     // Clear queue after sending
     queueCount = 0;
+    responseReady = false;
 }
 
 
-void I2CComms::processPacket(uint8_t data[], uint8_t from, uint8_t to) {
-    
+void I2CComms::processPendingRequest() {
+    if (!requestPending) {
+        return;
+    }
+
+    uint8_t localBuffer[INPUT_SIZE];
+    uint8_t localLen = 0;
+    uint8_t localFlags = 0;
+
+    noInterrupts();
+    localLen = pendingLen;
+    localFlags = pendingFlags;
+    memcpy(localBuffer, pendingBuffer, localLen);
+    requestPending = false;
+    interrupts();
+
+    requestFlags = localFlags;
+
+    if (isDebugEnabled()) {
+        Serial.print("I2C RX len=");
+        Serial.print(localLen);
+        Serial.print(" flags=0x");
+        Serial.println(requestFlags, HEX);
+
+        Serial.print("I2C RX data: ");
+        for (uint8_t i = 0; i < localLen; i++) {
+            Serial.print("0x");
+            if (localBuffer[i] < 16) Serial.print("0");
+            Serial.print(localBuffer[i], HEX);
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+
+    queueCount = 0;
+    int start = -1;
+
+    for (uint8_t i = 1; i < localLen; i++) {
+        if (localBuffer[i] == 0xAA) {
+            if (start != -1) {
+                processPacket(localBuffer, start, i, isDebugEnabled());
+            }
+            start = i;
+        }
+    }
+
+    if (start != -1) {
+        processPacket(localBuffer, start, localLen, isDebugEnabled());
+    } else if (queueCount < QUEUE_SIZE) {
+        responseQueue[queueCount][0] = StatusCodes::ERR_FRAMING;
+        responseQueue[queueCount][1] = 0x00;
+        responseQueue[queueCount][2] = 0x00;
+        responseQueue[queueCount][3] = 0x00;
+        queueCount++;
+    }
+
+    noInterrupts();
+    responseReady = true;
+    interrupts();
+}
+
+
+void I2CComms::processPacket(uint8_t data[], uint8_t from, uint8_t to, bool debugEnabled) {
     uint8_t msgLen = to - from;
-    uint8_t response[I2CComms::RESPONSE_SIZE];
+    uint8_t response[8];
     uint8_t responseLen = 0;
 
-    if (msgLen <= 0) {
+    if (msgLen == 0) {
         return;
     }
 
     g_protocol->processBinary(&data[from],
                             msgLen,
                             response,
-                            responseLen);
+                            responseLen,
+                            debugEnabled);
 
-    if (responseLen > 0) {
-        // Add response to queue if space available
-        if (queueCount >= QUEUE_SIZE) {
-            Serial.println("ERROR: Response queue full!");
-            return;
+    if (queueCount >= QUEUE_SIZE) {
+        if (debugEnabled) {
+            Serial.println("I2C response queue full");
         }
-        
-        memcpy(responseQueue[queueCount], response, responseLen);
-        queueCount++;
-    }
-    
-    /*
-    // Optional: debug output
-    Serial.print("Processed packet: ");
-    for (int i = 0; i < msgLen; i++) {
-        Serial.print("0x");
-        if (data[from + i] < 16) Serial.print("0");
-        Serial.print(data[from + i], HEX);
-        Serial.print(" ");
+        return;
     }
 
-    Serial.print("Response: ");
-    for (int i = 0; i < responseLen; i++) {
-        Serial.print("0x");
-        if (response[i] < 16) Serial.print("0");
-        Serial.print(response[i], HEX);
-        Serial.print(" ");
+    packResponseRecord(response, responseLen, responseQueue[queueCount]);
+
+    if (debugEnabled) {
+        Serial.print("Queued response status=0x");
+        Serial.println(responseQueue[queueCount][0], HEX);
     }
-    Serial.println();
-*/
+
+    queueCount++;
 }

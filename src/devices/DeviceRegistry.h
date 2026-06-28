@@ -29,6 +29,9 @@ public:
     // Convert text → binary command ID
     bool getCmdByText(String text, uint8_t& cmd);
 
+    // Convert command ID → text alias (useful for debug output)
+    bool getTextByCmd(uint8_t cmd, String& text);
+
     // Optional helper (useful for debugging / introspection later)
     uint8_t getCount();
 };

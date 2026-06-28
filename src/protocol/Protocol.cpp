@@ -1,4 +1,5 @@
 #include "Protocol.h"
+#include "StatusCodes.h"
 
 Protocol::Protocol(DeviceRegistry* reg) {
     registry = reg;
@@ -45,7 +46,7 @@ String Protocol::processTextBatch(String input) {
             if (!translateToBinary(token, binary, len)) {
                 result += "ERR";
             } else {
-                processBinary(binary, len, response, responseLen);
+                processBinary(binary, len, response, responseLen, true);
 
                 // Append response bytes to result
                 for (int i = 0; i < responseLen; i++) {
@@ -81,7 +82,7 @@ uint8_t convertParam(String val, uint8_t* out) {
         
         // Validate that the rest is a number
         bool isNum = true;
-        for (int i = 0; i < numStr.length(); i++) {
+        for (unsigned int i = 0; i < (unsigned int)numStr.length(); i++) {
             if (!isdigit(numStr[i])) {
                 isNum = false;
                 break;
@@ -163,7 +164,8 @@ bool Protocol::translateToBinary(String input, uint8_t* out, uint8_t& len) {
 void Protocol::processBinary(uint8_t* data,
                               uint8_t len,
                               uint8_t* response,
-                              uint8_t& responseLen) {
+                              uint8_t& responseLen,
+                              bool isDebugEnabled) {
     responseLen = 0;
 
     for (int i = 0; i < len; i++) {
@@ -175,11 +177,25 @@ void Protocol::processBinary(uint8_t* data,
 
             uint8_t cmd = data[i + 1];
 
+            if (isDebugEnabled) {
+                String deviceName;
+                if (registry->getTextByCmd(cmd, deviceName)) {
+                    Serial.print("processBinary cmd 0x");
+                    Serial.print(cmd, HEX);
+                    Serial.print(" -> ");
+                    Serial.println(deviceName);
+                } else {
+                    Serial.print("processBinary cmd 0x");
+                    Serial.print(cmd, HEX);
+                    Serial.println(" -> unknown");
+                }
+            }
+
             IDevice* dev = registry->getDeviceByCmd(cmd);
-            
+
             if (!dev) {
                 response[0] = 0xAA;
-                response[1] = 0xFD; // unknown command
+                response[1] = StatusCodes::ERR_UNKNOWN_COMMAND;
                 responseLen = 2;
                 return;
             }
@@ -191,7 +207,7 @@ void Protocol::processBinary(uint8_t* data,
 
             if (!dev->validate(&data[i + 1], len - i - 1, error)) {
                 response[0] = 0xAA;
-                response[1] = 0xFE; // validation error
+                response[1] = StatusCodes::ERR_VALIDATION;
                 responseLen = 2;
                 return;
             }
@@ -202,7 +218,8 @@ void Protocol::processBinary(uint8_t* data,
             dev->handleBinary(&data[i + 1],
                               len - i - 1,
                               response,
-                              responseLen);
+                              responseLen,
+                              isDebugEnabled);
 
             return;
         }
@@ -210,6 +227,6 @@ void Protocol::processBinary(uint8_t* data,
 
     // No sync byte found
     response[0] = 0xAA;
-    response[1] = 0xFC; // framing error
+    response[1] = StatusCodes::ERR_FRAMING;
     responseLen = 2;
 }

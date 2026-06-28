@@ -17,5 +17,6 @@ public:
     void processBinary(uint8_t* data,
                        uint8_t len,
                        uint8_t* response,
-                       uint8_t& responseLen);
+                       uint8_t& responseLen,
+                        bool isDebugEnabled);
 };

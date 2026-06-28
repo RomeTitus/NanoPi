@@ -39,7 +39,9 @@ bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
 void PinHandler::handleBinary(uint8_t* data,
                               uint8_t len,
                               uint8_t* response,
-                              uint8_t& responseLen) {
+                              uint8_t& responseLen,
+                              bool isDebugEnabled) {
+    (void)isDebugEnabled;
 
     uint8_t mode = data[1];  // Write or Read
     uint8_t pin = data[2];   // Pin number (0-13 digital, 14-21 for A0-A7)

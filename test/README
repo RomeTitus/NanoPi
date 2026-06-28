@@ -9,3 +9,16 @@ in the development cycle.
 
 More information about PlatformIO Unit Testing:
 - https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+
+Current test suites:
+- test_protocol_registry: validates DeviceRegistry mappings and Protocol status/error behavior.
+
+Run tests (build + upload + execute):
+- pio test -e nanoatmega328-old-test
+
+Compile tests only (no upload):
+- pio test -e nanoatmega328-old-test --without-uploading
+
+Notes:
+- Close any serial monitor before running tests to avoid COM port "Access is denied" errors.
+- The test environment excludes src/main.cpp and builds the rest of src/ for unit tests.

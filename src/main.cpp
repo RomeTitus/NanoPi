@@ -26,4 +26,5 @@ void setup() {
 
 void loop() {
     serialComms.loop();
+    i2cComms.loop();
 }

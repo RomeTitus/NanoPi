@@ -7,7 +7,8 @@ public:
     void handleBinary(uint8_t* data,
                       uint8_t len,
                       uint8_t* response,
-                      uint8_t& responseLen) override;
+                      uint8_t& responseLen,
+                      bool isDebugEnabled) override;
 
     bool validate(uint8_t* data,
                   uint8_t len,

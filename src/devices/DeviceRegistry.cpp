@@ -55,6 +55,20 @@ bool DeviceRegistry::getCmdByText(String text, uint8_t& cmd) {
 }
 
 // ----------------------------------------------------
+// Command ID → text alias (used by debug traces)
+// ----------------------------------------------------
+bool DeviceRegistry::getTextByCmd(uint8_t cmd, String& text) {
+    for (int i = 0; i < count; i++) {
+        if (entries[i].cmd == cmd) {
+            text = entries[i].text;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ----------------------------------------------------
 uint8_t DeviceRegistry::getCount() {
     return count;
 }

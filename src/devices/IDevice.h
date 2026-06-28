@@ -8,7 +8,8 @@ public:
     virtual void handleBinary(uint8_t* data,
                               uint8_t len,
                               uint8_t* response,
-                              uint8_t& responseLen) = 0;
+                              uint8_t& responseLen,
+                              bool isDebugEnabled) = 0;
 
     virtual bool validate(uint8_t* data,
                           uint8_t len,
