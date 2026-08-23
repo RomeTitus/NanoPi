@@ -1,4 +1,5 @@
 #include "I2CComms.h"
+#include "I2CWatchdog.h"
 #include "../protocol/StatusCodes.h"
 
 // ----------------------------------------------------
@@ -9,8 +10,8 @@ uint8_t I2CComms::pendingBuffer[I2CComms::INPUT_SIZE];
 
 // Response queue for batched messages
 uint8_t I2CComms::responseQueue[I2CComms::QUEUE_SIZE][I2CComms::RESPONSE_SIZE];
-uint8_t I2CComms::queueCount = 0;
-uint8_t I2CComms::requestFlags = 0;
+volatile uint8_t I2CComms::queueCount = 0;
+volatile uint8_t I2CComms::requestFlags = 0;
 volatile uint8_t I2CComms::pendingLen = 0;
 volatile uint8_t I2CComms::pendingFlags = 0;
 volatile bool I2CComms::requestPending = false;
@@ -35,10 +36,14 @@ void I2CComms::begin() {
 
     Wire.onReceive(I2CComms::onReceive);
     Wire.onRequest(I2CComms::onRequest);
+
+    I2CWatchdog::begin();
 }
 
 void I2CComms::loop() {
     processPendingRequest();
+
+    I2CWatchdog::check();
 }
 
 uint8_t I2CComms::calculateChecksum(const uint8_t* data, uint8_t len) {
@@ -99,6 +104,7 @@ void I2CComms::packResponseRecord(const uint8_t* response,
 // ----------------------------------------------------
 void I2CComms::onReceive(int len) {
     (void)len;
+    I2CWatchdog::noteActivity();
 
     //No Data
     if(len == 0) {
@@ -148,6 +154,8 @@ void I2CComms::onReceive(int len) {
 // Outgoing frame: [count][records...][checksum]
 // ----------------------------------------------------
 void I2CComms::onRequest() {
+    I2CWatchdog::noteActivity();
+
     const uint8_t MAX_I2C_TX = MAX_I2C_FRAME;
     uint8_t outBuffer[MAX_I2C_TX];
     uint8_t offset = 0;

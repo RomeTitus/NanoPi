@@ -18,8 +18,8 @@ private:
     static uint8_t inputBuffer[INPUT_SIZE]; 
     static uint8_t pendingBuffer[INPUT_SIZE];
     static uint8_t responseQueue[QUEUE_SIZE][RESPONSE_SIZE];
-    static uint8_t queueCount;
-    static uint8_t requestFlags;
+    static volatile uint8_t queueCount;
+    static volatile uint8_t requestFlags;
     static volatile uint8_t pendingLen;
     static volatile uint8_t pendingFlags;
     static volatile bool requestPending;

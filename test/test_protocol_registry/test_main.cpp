@@ -3,6 +3,7 @@
 
 #include "devices/DeviceRegistry.h"
 #include "devices/IDevice.h"
+#include "comms/I2CWatchdog.h"
 #include "protocol/Protocol.h"
 #include "protocol/StatusCodes.h"
 
@@ -53,6 +54,12 @@ public:
         (void)isDebugEnabled;
     }
 };
+
+volatile bool g_watchdogFeedCalled = false;
+
+void markWatchdogFeedCalled() {
+    g_watchdogFeedCalled = true;
+}
 
 void test_registry_bidirectional_lookup() {
     DeviceRegistry registry;
@@ -138,6 +145,28 @@ void test_processBinary_framing_error() {
     TEST_ASSERT_EQUAL_HEX8(StatusCodes::ERR_FRAMING, res[1]);
 }
 
+void test_i2c_watchdog_feeds_when_activity_is_recent() {
+    I2CWatchdog::setFeedHandlerForTest(markWatchdogFeedCalled);
+    g_watchdogFeedCalled = false;
+
+    I2CWatchdog::setStateForTest(true, millis() - 1000UL);
+    I2CWatchdog::check();
+
+    TEST_ASSERT_TRUE(g_watchdogFeedCalled);
+}
+
+void test_i2c_watchdog_stops_feeding_after_timeout() {
+    I2CWatchdog::setFeedHandlerForTest(markWatchdogFeedCalled);
+    g_watchdogFeedCalled = false;
+
+    I2CWatchdog::setStateForTest(true, millis() - 120001UL);
+    I2CWatchdog::check();
+
+    TEST_ASSERT_FALSE(g_watchdogFeedCalled);
+
+    I2CWatchdog::setFeedHandlerForTest(nullptr);
+}
+
 } // namespace
 
 void setup() {
@@ -148,6 +177,8 @@ void setup() {
     RUN_TEST(test_processBinary_validation_error);
     RUN_TEST(test_processBinary_success_path);
     RUN_TEST(test_processBinary_framing_error);
+    RUN_TEST(test_i2c_watchdog_feeds_when_activity_is_recent);
+    RUN_TEST(test_i2c_watchdog_stops_feeding_after_timeout);
     UNITY_END();
 }
 
