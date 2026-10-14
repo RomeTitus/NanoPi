@@ -134,19 +134,15 @@ void I2CComms::onReceive(int len) {
     requestFlags = inputBuffer[0];
 
     // New request arrived; discard any previous queued response so replies stay request-local.
-    noInterrupts();
     queueCount = 0;
     responseReady = false;
-    interrupts();
 
     // Store request and defer heavy processing to main loop.
     memcpy(pendingBuffer, inputBuffer, inputLen);
-    noInterrupts();
     pendingLen = inputLen;
     pendingFlags = requestFlags;
     requestPending = true;
     responseReady = false;
-    interrupts();
 }
 
 // ----------------------------------------------------
@@ -195,16 +191,7 @@ void I2CComms::onRequest() {
     outBuffer[offset++] = checksum;
     Wire.write(outBuffer, offset);
 
-    if (isDebugEnabled()) {
-        Serial.print("I2C TX frame: ");
-        for (uint8_t i = 0; i < offset; i++) {
-            Serial.print("0x");
-            if (outBuffer[i] < 16) Serial.print("0");
-            Serial.print(outBuffer[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-    }
+    // Never print from the Wire ISR: serial output can stall and delay RS485.
 
     // Clear queue after sending
     queueCount = 0;

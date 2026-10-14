@@ -5,6 +5,9 @@
 class SerialComms {
 private:
     Protocol* protocol;
+    char input[96] = {};
+    uint8_t used = 0;
+    bool overflow = false;
 
 public:
     SerialComms(Protocol* proto);

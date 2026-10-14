@@ -1,4 +1,5 @@
 #include "PinHandler.h"
+#include "../comms/RS485Config.h"
 
 PinHandler::PinHandler() {
 }
@@ -22,7 +23,7 @@ bool PinHandler::validate(uint8_t* data, uint8_t len, String& error) {
 
     // pin range check (0-13 digital, 14-17 and 20-21 for A0-A3 and A6-A7)
     // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
-    if (pin > 21 || pin == 18 || pin == 19) {
+    if (pin > 21 || RS485Config::reserved(pin) || (mode == 0 && pin >= 20)) {
         error = "Pin: invalid pin";
         return false;
     }

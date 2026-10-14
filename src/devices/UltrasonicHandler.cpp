@@ -1,5 +1,6 @@
 #include "UltrasonicHandler.h"
 #include "../protocol/StatusCodes.h"
+#include "../comms/RS485Config.h"
 
 static const unsigned long ULTRASONIC_PULSE_TIMEOUT_US = 30000UL;
 static const unsigned long ULTRASONIC_MIN_GAP_US = 60000UL;
@@ -10,7 +11,7 @@ UltrasonicHandler::UltrasonicHandler() {
 }
 
 bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
-    if (len - 1 < 2) { 
+    if (len < 3) {
         error = "US: missing args";
         return false;
     }
@@ -19,13 +20,13 @@ bool UltrasonicHandler::validate(uint8_t* data, uint8_t len, String& error) {
     uint8_t echo = data[2];
 
     // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
-    if (trig > 21 || trig == 18 || trig == 19) {
+    if (trig > 19 || RS485Config::reserved(trig) || trig == echo) {
         error = "Trig: invalid pin";
         return false;
     }
 
     // A4 (pin 18) and A5 (pin 19) are reserved for I2C (SDA/SCL)
-    if (echo > 21 || echo == 18 || echo == 19) {
+    if (echo > 19 || RS485Config::reserved(echo)) {
         error = "Echo: invalid pin";
         return false;
     }
@@ -84,7 +85,10 @@ long UltrasonicHandler::readDistance(uint8_t trigPin, uint8_t echoPin) {
     unsigned long nowUs = micros();
     unsigned long elapsedUs = nowUs - s_lastPingUs;
     if (elapsedUs < ULTRASONIC_MIN_GAP_US) {
-        delayMicroseconds(ULTRASONIC_MIN_GAP_US - elapsedUs);
+        // AVR delayMicroseconds cannot safely represent this entire 60 ms wait.
+        unsigned long remaining = ULTRASONIC_MIN_GAP_US - elapsedUs;
+        delay(remaining / 1000);
+        delayMicroseconds(remaining % 1000);
     }
     s_lastPingUs = micros();
 
