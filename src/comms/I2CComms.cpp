@@ -98,13 +98,12 @@ void I2CComms::packResponseRecord(const uint8_t* response,
 
 
 // ----------------------------------------------------
-// RECEIVE EVENT (MASTER → SLAVE)
+// RECEIVE EVENT (MASTER â†’ SLAVE)
 // Incoming frame: [flags][payload...]
 // Payload may contain multiple variable-length packets delimited by 0xAA.
 // ----------------------------------------------------
 void I2CComms::onReceive(int len) {
     (void)len;
-    I2CWatchdog::noteActivity();
 
     //No Data
     if(len == 0) {
@@ -150,7 +149,6 @@ void I2CComms::onReceive(int len) {
 // Outgoing frame: [count][records...][checksum]
 // ----------------------------------------------------
 void I2CComms::onRequest() {
-    I2CWatchdog::noteActivity();
 
     const uint8_t MAX_I2C_TX = MAX_I2C_FRAME;
     uint8_t outBuffer[MAX_I2C_TX];

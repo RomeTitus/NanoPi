@@ -303,27 +303,16 @@ void test_processBinary_framing_error() {
     TEST_ASSERT_EQUAL_HEX8(StatusCodes::ERR_FRAMING, res[1]);
 }
 
-void test_i2c_watchdog_feeds_when_activity_is_recent() {
+void test_watchdog_feeds_without_i2c_traffic() {
     I2CWatchdog::setFeedHandlerForTest(markWatchdogFeedCalled);
     g_watchdogFeedCalled = false;
 
-    I2CWatchdog::setStateForTest(true, millis() - 1000UL);
     I2CWatchdog::check();
 
+    I2CWatchdog::setFeedHandlerForTest(nullptr);
     TEST_ASSERT_TRUE(g_watchdogFeedCalled);
 }
 
-void test_i2c_watchdog_stops_feeding_after_timeout() {
-    I2CWatchdog::setFeedHandlerForTest(markWatchdogFeedCalled);
-    g_watchdogFeedCalled = false;
-
-    I2CWatchdog::setStateForTest(true, millis() - 120001UL);
-    I2CWatchdog::check();
-
-    TEST_ASSERT_FALSE(g_watchdogFeedCalled);
-
-    I2CWatchdog::setFeedHandlerForTest(nullptr);
-}
 
 } // namespace
 
@@ -335,8 +324,7 @@ void setup() {
     RUN_TEST(test_processBinary_validation_error);
     RUN_TEST(test_processBinary_success_path);
     RUN_TEST(test_processBinary_framing_error);
-    RUN_TEST(test_i2c_watchdog_feeds_when_activity_is_recent);
-    RUN_TEST(test_i2c_watchdog_stops_feeding_after_timeout);
+    RUN_TEST(test_watchdog_feeds_without_i2c_traffic);
     RUN_TEST(test_remote_ultrasonic_subtracts_offset_and_preserves_reply);
     RUN_TEST(test_local_command_does_not_forward);
     RUN_TEST(test_bad_remote_routes_rejected);
