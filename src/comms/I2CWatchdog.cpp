@@ -5,7 +5,7 @@ static void (*g_watchdogFeedHandler)() = nullptr;
 #endif
 
 void I2CWatchdog::begin() {
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) && !defined(NANO_BENCH_NO_WATCHDOG)
     wdt_enable(WDTO_8S);
     wdt_reset();
 #endif
@@ -25,7 +25,7 @@ void I2CWatchdog::feedHardwareWatchdog() {
     }
 #endif
 
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) && !defined(NANO_BENCH_NO_WATCHDOG)
     wdt_reset();
 #endif
 }
