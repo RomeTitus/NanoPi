@@ -16,6 +16,10 @@ volatile uint8_t I2CComms::pendingLen = 0;
 volatile uint8_t I2CComms::pendingFlags = 0;
 volatile bool I2CComms::requestPending = false;
 volatile bool I2CComms::responseReady = false;
+#ifdef NANO_BENCH_NO_WATCHDOG
+volatile uint16_t I2CComms::diagnosticRxCount = 0;
+volatile uint16_t I2CComms::diagnosticRequestCount = 0;
+#endif
 
 // We need a global pointer bridge for ISR safety
 static Protocol* g_protocol = nullptr;
@@ -44,6 +48,35 @@ void I2CComms::loop() {
     processPendingRequest();
 
     I2CWatchdog::check();
+
+#ifdef NANO_BENCH_NO_WATCHDOG
+    static unsigned long lastDiagnosticMs = 0;
+    unsigned long now = millis();
+    if (now - lastDiagnosticMs >= 1000) {
+        uint16_t rxCount;
+        uint16_t requestCount;
+        bool pending;
+        bool ready;
+        noInterrupts();
+        rxCount = diagnosticRxCount;
+        requestCount = diagnosticRequestCount;
+        pending = requestPending;
+        ready = responseReady;
+        interrupts();
+
+        Serial.print(F("HB ms="));
+        Serial.print(now);
+        Serial.print(F(" rx="));
+        Serial.print(rxCount);
+        Serial.print(F(" req="));
+        Serial.print(requestCount);
+        Serial.print(F(" pending="));
+        Serial.print(pending ? 1 : 0);
+        Serial.print(F(" ready="));
+        Serial.println(ready ? 1 : 0);
+        lastDiagnosticMs = now;
+    }
+#endif
 }
 
 uint8_t I2CComms::calculateChecksum(const uint8_t* data, uint8_t len) {
@@ -103,6 +136,9 @@ void I2CComms::packResponseRecord(const uint8_t* response,
 // Payload may contain multiple variable-length packets delimited by 0xAA.
 // ----------------------------------------------------
 void I2CComms::onReceive(int len) {
+#ifdef NANO_BENCH_NO_WATCHDOG
+    diagnosticRxCount++;
+#endif
     (void)len;
 
     //No Data
@@ -149,6 +185,9 @@ void I2CComms::onReceive(int len) {
 // Outgoing frame: [count][records...][checksum]
 // ----------------------------------------------------
 void I2CComms::onRequest() {
+#ifdef NANO_BENCH_NO_WATCHDOG
+    diagnosticRequestCount++;
+#endif
 
     const uint8_t MAX_I2C_TX = MAX_I2C_FRAME;
     uint8_t outBuffer[MAX_I2C_TX];

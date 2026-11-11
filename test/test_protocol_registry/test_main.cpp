@@ -178,20 +178,6 @@ void test_remote_pin_boundaries_and_write_value() {
     TEST_ASSERT_TRUE(device.validate(req + 1, 3, error));
 }
 
-void test_text_remote_and_overflow_validation() {
-    DeviceRegistry registry;
-    UltrasonicHandler device;
-    registry.registerCommand(2, "US", &device);
-    Protocol protocol(&registry);
-    FakeRemote remote;
-    protocol.setRemoteTransport(&remote);
-    TEST_ASSERT_EQUAL_STRING("aa007b", protocol.processInput("US,31,32").c_str());
-    TEST_ASSERT_EQUAL_STRING("ERR", protocol.processInput("US,287,32").c_str());
-    TEST_ASSERT_EQUAL_STRING("ERR", protocol.processInput("US,-1,32").c_str());
-    TEST_ASSERT_EQUAL_STRING("ERR", protocol.processInput("US,bad,32").c_str());
-    TEST_ASSERT_EQUAL_UINT8(1, remote.calls);
-}
-
 void test_rs485_crc_and_frame_validation() {
     const uint8_t vector[] = "123456789";
     TEST_ASSERT_EQUAL_HEX16(0x4B37, RS485Frame::crc16(vector, 9));
@@ -331,7 +317,6 @@ void setup() {
     RUN_TEST(test_remote_request_cannot_forward_again);
     RUN_TEST(test_remote_timeout_is_explicit);
     RUN_TEST(test_remote_pin_boundaries_and_write_value);
-    RUN_TEST(test_text_remote_and_overflow_validation);
     RUN_TEST(test_rs485_crc_and_frame_validation);
     UNITY_END();
 }

@@ -24,6 +24,10 @@ private:
     static volatile uint8_t pendingFlags;
     static volatile bool requestPending;
     static volatile bool responseReady;
+#ifdef NANO_BENCH_NO_WATCHDOG
+    static volatile uint16_t diagnosticRxCount;
+    static volatile uint16_t diagnosticRequestCount;
+#endif
 
     static uint8_t calculateChecksum(const uint8_t* data, uint8_t len);
     static bool isDebugEnabled();
